@@ -48,7 +48,7 @@ CREDS_JSON = """{
   "client_email": "nabhey@airy-gate-238512.iam.gserviceaccount.com",
   "client_id": "100136393772596802414",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
+  "token_uri": "https://oauth2.googleapis.com/token"
 }"""
 
 # 5. DEFAULT ROLES — user can change these in the app UI
