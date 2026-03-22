@@ -28,11 +28,11 @@ st.markdown("""
 # ════════════════════════════════════════════════════════════════════════════════
 
 # 1. ADZUNA — get free at https://developer.adzuna.com
-ADZUNA_ID  = "ac1a4ebd"
-ADZUNA_KEY = "b24bf85fcd6f5da0c1bf82d2d8ab5d30"
+ADZUNA_ID  = "PASTE_YOUR_ADZUNA_APP_ID_HERE"
+ADZUNA_KEY = "PASTE_YOUR_ADZUNA_APP_KEY_HERE"
 
 # 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
-JSEARCH_KEY = "c878633452mshdf37c1410b3565bp18b884jsn05ae0b0654b8"
+JSEARCH_KEY = "PASTE_YOUR_RAPIDAPI_KEY_HERE"
 
 # 3. GOOGLE SHEET — exact name of your sheet (case sensitive)
 SHEET_NAME = "Job Pipeline"
@@ -40,16 +40,21 @@ SHEET_NAME = "Job Pipeline"
 # 4. SERVICE ACCOUNT JSON — paste the full JSON from GCP between the triple quotes
 #    Steps: console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
 #    Then share your Google Sheet with the client_email below (Editor access)
-CREDS_JSON = """{
+CREDS_JSON = """
+PASTE_YOUR_FULL_SERVICE_ACCOUNT_JSON_HERE
+
+Example format:
+{
   "type": "service_account",
-  "project_id": "airy-gate-238512",
-  "private_key_id": "51cf2f8c913a7f9c5a84daac96bebfe3ff5048db",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCkm3nqSAH1U+W9\nJsqvdUVWX4IBsdMSl/3zTXajWjzgBVZ/ID3VVevckHZ/Xy3Jo8Xi1LQIM2N3GnRD\nFmaIEi85VLkxmuicFcpZElkNnrXJ3PERvpjxYc5O4s+UVIuJl4Aj3rM9H0OqdzgS\nIPaokdxK7uzCLIQW0inl2Dxk0r4wkyh5vskD48HnXpcPnyMTKbuBvIP1Qneoe6jA\nkG1PnWqsYhqCdWwK2qJsruO+vI4bLjFEd9TkZVyaJ+QxAiIJ0cGf61qkVQCxCW7l\nhhC0dlVwGlVs8Gix3pZLyaJfpu16hKi5zF2RPPCpDcsuwZaXqLmyJIBycshQxrHR\nzLr6jikHAgMBAAECggEAI57ZhQ9MDTC4mHQajFmORaCpW4CFspJdjBcJQ1Q1tCyz\niRMLDm1nevVwDyQjnmzoV6u7wcKNFasN2a6xRWTZ/0gMQ2XITG6SuS+1QbNEl4hO\nSo66PhHyOTPvw6OABqhYPGrm0qU/WVYvNg0YE2ZtC3IknehQNTgJhQmEGDVantwA\njzm/mmS+hFQ3bpz6xXAGsFZVhjeCLw86VJ+MOG1sl5s3iU8CuTi/dVRD4X36r5Kg\ntD+ie2T4c0Tig9FemfPNAhp/dXXs3hMTmMkGmY0BLfcL7ZSCF/MJIbefYN/1QEpM\noNhtj/7M1NXo5nLaHXJ5VBKfxS10ey5fmRyszGUNsQKBgQDVUU5h/j1GNL2ZT68P\nEGNFrRXzFozF+C/aynHas7T6zgSzvqE8RbX0lnIWg9Nn6tmGJPs1kpRSuUsebm5p\nhsDubC5OHbCaCggaPfa66XA9JeHR7j6YcGz4Zt+azJUWhXLSL/QKSgasR7td1N5m\nWB8M+Qw9OLDcEUn24jn1x8Tj1QKBgQDFixm+D8nrRR4ylpftjfh1m4TG3mb7+f26\nCSW95ViWerC9lL3pOO6odM2MnJsFYUwt8PHw5ErsDb/SkEn04w3PqnN7EkKYLzgs\n+xbD5OFLLSeMLydeKix2NFM/V9/MxaO/A+xax57gRo6T+VGdV+VlaViZcOY/am7s\n1pXy66GzawKBgFTAZvn7/vBDyAh/Zjf/9NEcAZqBHRESmEC/KhkQSRlUfP3FAV5m\n+/HfTBix625gGmh3jO8t+4waXkQK8AcxKLoRdRxII4Av+CQk9kAwuw0wXdYAaBI8\nqK7QgIqKObmm74We08C6xIfyP/j5uBrFbCDFWh2AxpPIsrBKFWkXI5y5AoGAaGBr\nJaWqBwnqPsibVgWhtmKJ8ZopyBH7IoUa0A+Sk1AYetNQ1R4j3BZ7VUSaFGmoms2o\nyKOXgspxBI0AxsgB0Cw8AFdRoJ+yivHQwYj6EYK2VrfDkVmvTHWxVtLTiZsUPiWQ\niRbYt6AQTdd6bCy5JLBZBBpHTlKqcbGgYU5njikCgYBhVjeOZF0xFDKbSkCOJA2z\n30NyW/PPNabm++T1tUlQSyCttGcgX7CpMUXhyYiKSAL72Mw+tAr2qudggSyl1PMn\nTZg7Tv51cnNnUM01RAKrDCn33PfIdnU1mUG20EDRUcIvH7jN+MTbmCN9J6UxIjHC\nj/dbbQ1r1LnhO2KOrcGH2A==\n-----END PRIVATE KEY-----\n",
-  "client_email": "nabhey@airy-gate-238512.iam.gserviceaccount.com",
-  "client_id": "100136393772596802414",
+  "project_id": "your-project-id",
+  "private_key_id": "abc123",
+  "private_key": "-----BEGIN RSA PRIVATE KEY-----\\nYOUR_KEY\\n-----END RSA PRIVATE KEY-----\\n",
+  "client_email": "your-bot@your-project.iam.gserviceaccount.com",
+  "client_id": "123456789",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token"
-}"""
+}
+"""
 
 # 5. DEFAULT ROLES — user can change these in the app UI
 DEFAULT_ROLES = [
@@ -73,7 +78,15 @@ def job_id(title, company):
 
 def get_sheet():
     try:
-        creds_dict = json.loads(CREDS_JSON)
+        # Fix: GitHub editor converts \n to real newlines in private_key
+        # This restores them back to escaped \n so json.loads works
+        import re
+        fixed = CREDS_JSON
+        def fix_key(m):
+            inner = m.group(1).replace('\n', '\\n')
+            return f'"private_key": "{inner}"'
+        fixed = re.sub(r'"private_key":\s*"(.*?)"(?=\s*,)', fix_key, fixed, flags=re.DOTALL)
+        creds_dict = json.loads(fixed)
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive",
@@ -91,8 +104,8 @@ def get_sheet():
                 "Remote","Status","Match Score","Verdict"
             ])
         return ws, None
-    except json.JSONDecodeError as e:
-        return None, f"JSON Error: {str(e)}"
+    except json.JSONDecodeError:
+        return None, "CREDS_JSON is not valid JSON — check the format in config section"
     except Exception as e:
         return None, str(e)
 
@@ -206,7 +219,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Google Sheet Name")
-    SHEET_NAME = st.text_input("Sheet name (case sensitive)", value="Job Pipeline")
+    SHEET_NAME = st.text_input("Sheet name (case sensitive)", value=SHEET_NAME_DEFAULT)
     st.markdown("""
 <div style="background:#0d1a00; border:1px solid #34d399; border-left:3px solid #34d399;
      border-radius:6px; padding:12px; margin-top:8px; font-size:13px;">
