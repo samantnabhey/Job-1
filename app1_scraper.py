@@ -91,8 +91,8 @@ def get_sheet():
                 "Remote","Status","Match Score","Verdict"
             ])
         return ws, None
-    except json.JSONDecodeError:
-        return None, "CREDS_JSON is not valid JSON — check the format in config section"
+    except json.JSONDecodeError as e:
+        return None, f"JSON Error: {str(e)}"
     except Exception as e:
         return None, str(e)
 
