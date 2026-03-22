@@ -6,6 +6,7 @@ from datetime import datetime, date
 import json
 import time
 import hashlib
+import re
 
 st.set_page_config(page_title="App 1 — Job Scraper", page_icon="🔍", layout="wide")
 
@@ -34,53 +35,35 @@ ADZUNA_KEY = "PASTE_YOUR_ADZUNA_APP_KEY_HERE"
 # 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
 JSEARCH_KEY = "PASTE_YOUR_RAPIDAPI_KEY_HERE"
 
-# 3. GOOGLE SHEET — exact name of your sheet (case sensitive)
-SHEET_NAME = "Job Pipeline"
-
-# 4. SERVICE ACCOUNT JSON — paste the full JSON from GCP between the triple quotes
-#    Steps: console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
-#    Then share your Google Sheet with the client_email below (Editor access)
+# 3. SERVICE ACCOUNT JSON — paste full JSON from GCP between the triple quotes
+#    console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
 CREDS_JSON = """
 PASTE_YOUR_FULL_SERVICE_ACCOUNT_JSON_HERE
-
-Example format:
-{
-  "type": "service_account",
-  "project_id": "your-project-id",
-  "private_key_id": "abc123",
-  "private_key": "-----BEGIN RSA PRIVATE KEY-----\\nYOUR_KEY\\n-----END RSA PRIVATE KEY-----\\n",
-  "client_email": "your-bot@your-project.iam.gserviceaccount.com",
-  "client_id": "123456789",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token"
-}
 """
 
-# 5. DEFAULT ROLES — user can change these in the app UI
+# 4. DEFAULT ROLES — user can change in the app sidebar
 DEFAULT_ROLES = [
     "Product Manager",
     "Product Marketing Manager",
     "Growth Marketing Manager",
 ]
 
-# 6. COUNTRIES — adzuna country codes: in=India, gb=UK, us=USA, au=Australia
+# 5. ADZUNA COUNTRY CODE — in=India, gb=UK, us=USA, au=Australia
 ADZUNA_COUNTRY = "in"
 
-# 7. DEFAULT DAYS BACK — user can change this in the app UI
+# 6. DEFAULT DAYS BACK — user can change in the app sidebar
 DEFAULT_DAYS_BACK = 3
 
 # ════════════════════════════════════════════════════════════════════════════════
-# ██  END OF CONFIG — do not edit below this line  ██████████████████████████  ██
+# ██  END OF CONFIG — do not edit below this line  ████████████████████████████ ██
 # ════════════════════════════════════════════════════════════════════════════════
 
 def job_id(title, company):
     return hashlib.md5(f"{title}{company}".lower().encode()).hexdigest()[:8]
 
-def get_sheet():
+def get_sheet(sheet_name):
     try:
-        # Fix: GitHub editor converts \n to real newlines in private_key
-        # This restores them back to escaped \n so json.loads works
-        import re
+        # Fix: GitHub editor sometimes converts \n to real newlines in private_key
         fixed = CREDS_JSON
         def fix_key(m):
             inner = m.group(1).replace('\n', '\\n')
@@ -93,19 +76,19 @@ def get_sheet():
         ]
         creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
-        sh     = client.open(SHEET_NAME)
+        sh     = client.open(sheet_name)
         try:
             ws = sh.worksheet("Jobs")
         except gspread.WorksheetNotFound:
             ws = sh.add_worksheet(title="Jobs", rows=1000, cols=20)
             ws.append_row([
-                "ID","Date Added","Title","Company","Location",
-                "Source","Role","Salary","URL","JD Summary",
-                "Remote","Status","Match Score","Verdict"
+                "ID", "Date Added", "Title", "Company", "Location",
+                "Source", "Role", "Salary", "URL", "JD Summary",
+                "Remote", "Status", "Match Score", "Verdict"
             ])
         return ws, None
-    except json.JSONDecodeError:
-        return None, "CREDS_JSON is not valid JSON — check the format in config section"
+    except json.JSONDecodeError as e:
+        return None, f"JSON Error: {str(e)}"
     except Exception as e:
         return None, str(e)
 
@@ -199,14 +182,14 @@ def save_jobs(ws, jobs, existing_ids):
 st.title("🔍 App 1 — Job Scraper")
 st.caption("Fetches jobs from Adzuna + JSearch and saves to Google Sheet.")
 
-# ── Sidebar — user inputs ─────────────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("🔧 Search Settings")
 
     st.subheader("Job Positions")
-    st.caption("Add or remove roles to search for")
+    st.caption("One role per line — add or remove as needed")
     roles_input = st.text_area(
-        "One role per line",
+        "roles",
         value="\n".join(DEFAULT_ROLES),
         height=120,
         label_visibility="collapsed"
@@ -218,22 +201,26 @@ with st.sidebar:
     days_back = st.slider("Fetch jobs posted in last N days", 1, 30, DEFAULT_DAYS_BACK)
 
     st.divider()
-    st.subheader("Google Sheet Name")
-    SHEET_NAME = st.text_input("Sheet name (case sensitive)", value=SHEET_NAME_DEFAULT)
+    st.subheader("Google Sheet")
+    SHEET_NAME = st.text_input(
+        "Sheet File Name",
+        value="Job Pipeline",
+        placeholder="e.g. Job Pipeline",
+        help="Exact name of your Google Sheet (case sensitive)"
+    )
+    st.caption("📌 Create a Google Sheet with this exact name, then share it with Editor access to:")
     st.markdown("""
 <div style="background:#0d1a00; border:1px solid #34d399; border-left:3px solid #34d399;
-     border-radius:6px; padding:12px; margin-top:8px; font-size:13px;">
-    <strong style="color:#34d399;">📋 Sheet Setup:</strong><br/><br/>
-    <span style="color:#a0aec0;">1. Create a Google Sheet with the name above</span><br/><br/>
-    <span style="color:#a0aec0;">2. Share it with <strong>Editor</strong> access to:</span><br/>
+     border-radius:6px; padding:12px; margin-top:4px;">
+    <span style="color:#a0aec0; font-size:12px;">Share with <strong>Editor</strong> access to:</span><br/>
     <div style="background:#0a0f00; border:1px solid #2a4a00; border-radius:4px;
          padding:8px; margin-top:6px; word-break:break-all;">
-        <span style="color:#38bdf8; font-size:12px; font-weight:bold;">
+        <span style="color:#38bdf8; font-size:11px; font-weight:bold;">
             nabhey@airy-gate-238512.iam.gserviceaccount.com
         </span>
     </div>
     <span style="color:#4a6a4a; font-size:11px; margin-top:6px; display:block;">
-        Once shared, jobs will auto-save to this sheet on every run.
+        Jobs will auto-save here on every run.
     </span>
 </div>
 """, unsafe_allow_html=True)
@@ -241,10 +228,10 @@ with st.sidebar:
 # ── Config validation ─────────────────────────────────────────────────────────
 config_ok = True
 warnings = []
-if "PASTE_YOUR_ADZUNA_APP_ID_HERE"  in ADZUNA_ID:  warnings.append("Adzuna App ID not set")
-if "PASTE_YOUR_ADZUNA_APP_KEY_HERE" in ADZUNA_KEY: warnings.append("Adzuna App Key not set")
-if "PASTE_YOUR_RAPIDAPI_KEY_HERE"   in JSEARCH_KEY:warnings.append("JSearch key not set")
-if "PASTE_YOUR_FULL_SERVICE"        in CREDS_JSON: warnings.append("Service Account JSON not set")
+if "PASTE_YOUR_ADZUNA_APP_ID_HERE"  in ADZUNA_ID:   warnings.append("Adzuna App ID not set")
+if "PASTE_YOUR_ADZUNA_APP_KEY_HERE" in ADZUNA_KEY:  warnings.append("Adzuna App Key not set")
+if "PASTE_YOUR_RAPIDAPI_KEY_HERE"   in JSEARCH_KEY: warnings.append("JSearch key not set")
+if "PASTE_YOUR_FULL_SERVICE"        in CREDS_JSON:  warnings.append("Service Account JSON not set")
 
 if warnings:
     st.warning(f"⚠️ Open `app1_scraper.py` → fill CONFIG section: {', '.join(warnings)}")
@@ -253,7 +240,7 @@ if warnings:
 # ── Sheet connection ──────────────────────────────────────────────────────────
 ws, sheet_err = None, None
 if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
-    ws, sheet_err = get_sheet()
+    ws, sheet_err = get_sheet(SHEET_NAME)
     if sheet_err:
         st.error(f"Sheet error: {sheet_err}")
     else:
@@ -280,10 +267,10 @@ run_btn = st.button(
     disabled=(not config_ok or not ROLES),
 )
 
+# ── Scraping ──────────────────────────────────────────────────────────────────
 if run_btn:
     all_jobs, log_lines = [], []
-    sources = ["Adzuna", "JSearch"]
-    total_steps = max(len(ROLES) * len(sources), 1)
+    total_steps = max(len(ROLES) * 2, 1)
     step = 0
     progress = st.progress(0, text="Starting...")
 
@@ -315,7 +302,7 @@ if run_btn:
         st.session_state["last_run"] = datetime.now().strftime("%H:%M, %d %b")
         st.success(f"✅ Done — {len(deduped)} unique jobs, **{new_count} new** added to sheet.")
     else:
-        st.warning(f"Found {len(deduped)} jobs but Sheet not connected — add CREDS_JSON in config to save.")
+        st.warning(f"Found {len(deduped)} jobs but Sheet not connected — fix CREDS_JSON in config.")
 
     progress.empty()
 
