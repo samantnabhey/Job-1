@@ -49,7 +49,6 @@ CREDS_JSON = """{
   "client_id": "100136393772596802414",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
-  "type": "service_account"
 }"""
 
 # 5. DEFAULT ROLES — user can change these in the app UI
