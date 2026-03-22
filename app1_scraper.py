@@ -207,7 +207,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Google Sheet Name")
-    SHEET_NAME = st.text_input("Sheet name (case sensitive)", value=SHEET_NAME_DEFAULT)
+    SHEET_NAME = st.text_input("Sheet name (case sensitive)", value="Job Pipeline")
     st.markdown("""
 <div style="background:#0d1a00; border:1px solid #34d399; border-left:3px solid #34d399;
      border-radius:6px; padding:12px; margin-top:8px; font-size:13px;">
