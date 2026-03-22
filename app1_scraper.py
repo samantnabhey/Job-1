@@ -31,7 +31,7 @@ st.markdown("""
 ADZUNA_ID  = "ac1a4ebd"
 ADZUNA_KEY = "b24bf85fcd6f5da0c1bf82d2d8ab5d30"
 
-# 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
+# 2. JSEARCH — get free at https://rapidapi.com  → search JSearch → subscribe Basic
 JSEARCH_KEY = "c878633452mshdf37c1410b3565bp18b884jsn05ae0b0654b8"
 
 # 3. GOOGLE SHEET — exact name of your sheet (case sensitive)
