@@ -40,10 +40,6 @@ SHEET_NAME = "Job Pipeline"
 # 4. SERVICE ACCOUNT JSON — paste the full JSON from GCP between the triple quotes
 #    Steps: console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
 #    Then share your Google Sheet with the client_email below (Editor access)
-CREDS_JSON = """
-PASTE_YOUR_FULL_SERVICE_ACCOUNT_JSON_HERE
-
-Example format:
 {
   "type": "service_account",
   "project_id": "airy-gate-238512",
@@ -54,7 +50,6 @@ Example format:
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token"
 }
-"""
 
 # 5. ROLES TO SEARCH — add or remove as needed
 ROLES = [
