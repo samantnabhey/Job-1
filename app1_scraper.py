@@ -52,11 +52,17 @@ DEFAULT_ROLES = [
     "Growth Marketing Manager",
 ]
 
-# 5. ADZUNA COUNTRY CODE — in=India, gb=UK, us=USA, au=Australia
-ADZUNA_COUNTRY = "in"
-
-# 6. DEFAULT DAYS BACK — user can change in the app sidebar
+# 5. DEFAULT DAYS BACK — user can change in the app sidebar
 DEFAULT_DAYS_BACK = 3
+
+# 6. COUNTRY MAP
+COUNTRY_MAP = {
+    "India":     {"adzuna": "in",  "jsearch": "India"},
+    "UK":        {"adzuna": "gb",  "jsearch": "United Kingdom"},
+    "USA":       {"adzuna": "us",  "jsearch": "United States"},
+    "Australia": {"adzuna": "au",  "jsearch": "Australia"},
+    "Remote":    {"adzuna": "in",  "jsearch": "remote"},
+}
 
 # ════════════════════════════════════════════════════════════════════════════════
 # ██  END OF CONFIG — do not edit below this line  ████████████████████████████ ██
@@ -65,9 +71,8 @@ DEFAULT_DAYS_BACK = 3
 def job_id(title, company):
     return hashlib.md5(f"{title}{company}".lower().encode()).hexdigest()[:8]
 
-def get_sheet(sheet_name):
+def get_sheet(sheet_name, roles):
     try:
-        # Fix: GitHub editor sometimes converts \n to real newlines in private_key
         fixed = CREDS_JSON
         def fix_key(m):
             inner = m.group(1).replace('\n', '\\n')
@@ -81,20 +86,30 @@ def get_sheet(sheet_name):
         creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
         sh     = client.open(sheet_name)
+
+        # New worksheet name: first role first 20 chars + date
+        tab_label = roles[0][:20].strip() if roles else "Run"
+        tab_name  = f"{tab_label} {date.today().strftime('%d%b')}"
+
+        # Create fresh tab for this run
         try:
-            ws = sh.worksheet("Jobs")
+            # Delete if same name exists today (re-run)
+            existing = sh.worksheet(tab_name)
+            sh.del_worksheet(existing)
         except gspread.WorksheetNotFound:
-            ws = sh.add_worksheet(title="Jobs", rows=1000, cols=20)
-            ws.append_row([
-                "ID", "Date Added", "Title", "Company", "Location",
-                "Source", "Role", "Salary", "URL", "JD Summary",
-                "Remote", "Status", "Match Score", "Verdict"
-            ])
-        return ws, None
+            pass
+
+        ws = sh.add_worksheet(title=tab_name, rows=1000, cols=20)
+        ws.append_row([
+            "ID", "Date Added", "Title", "Company", "Location",
+            "Source", "Role", "Salary", "URL", "JD Summary",
+            "Remote", "Status", "Match Score", "Verdict"
+        ])
+        return ws, None, tab_name
     except json.JSONDecodeError as e:
-        return None, f"JSON Error: {str(e)}"
+        return None, f"JSON Error: {str(e)}", None
     except Exception as e:
-        return None, str(e)
+        return None, str(e), None
 
 def get_existing_ids(ws):
     try:
@@ -103,9 +118,9 @@ def get_existing_ids(ws):
     except:
         return set()
 
-def fetch_adzuna(role):
+def fetch_adzuna(role, country_code="in"):
     url = (
-        f"https://api.adzuna.com/v1/api/jobs/{ADZUNA_COUNTRY}/search/1"
+        f"https://api.adzuna.com/v1/api/jobs/{country_code}/search/1"
         f"?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}"
         f"&results_per_page=10&what={requests.utils.quote(role)}"
         f"&content-type=application/json"
@@ -130,8 +145,9 @@ def fetch_adzuna(role):
     except Exception as e:
         return [], str(e)
 
-def fetch_jsearch(role, days_back=3):
+def fetch_jsearch(role, days_back=3, country_name="India"):
     date_filter = "today" if days_back == 1 else f"{days_back}days" if days_back <= 7 else "month"
+    query = f"{role} {country_name}" if country_name != "remote" else f"{role} remote"
     try:
         r = requests.get(
             "https://jsearch.p.rapidapi.com/search",
@@ -140,7 +156,7 @@ def fetch_jsearch(role, days_back=3):
                 "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
             },
             params={
-                "query":      f"{role} India remote",
+                "query":      query,
                 "page":       "1",
                 "num_pages":  "1",
                 "date_posted": date_filter
@@ -201,6 +217,17 @@ with st.sidebar:
     ROLES = [r.strip() for r in roles_input.strip().split("\n") if r.strip()]
 
     st.divider()
+    st.subheader("Country")
+    selected_country = st.selectbox(
+        "country",
+        options=list(COUNTRY_MAP.keys()),
+        index=0,
+        label_visibility="collapsed"
+    )
+    adzuna_country = COUNTRY_MAP[selected_country]["adzuna"]
+    jsearch_country = COUNTRY_MAP[selected_country]["jsearch"]
+
+    st.divider()
     st.subheader("Days Back")
     days_back = st.slider("Fetch jobs posted in last N days", 1, 30, DEFAULT_DAYS_BACK)
 
@@ -242,20 +269,20 @@ if warnings:
     config_ok = False
 
 # ── Sheet connection ──────────────────────────────────────────────────────────
-ws, sheet_err = None, None
+ws, sheet_err, tab_name = None, None, None
 if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
-    ws, sheet_err = get_sheet(SHEET_NAME)
+    ws, sheet_err, tab_name = get_sheet(SHEET_NAME, ROLES)
     if sheet_err:
         st.error(f"Sheet error: {sheet_err}")
     else:
-        st.success(f"✅ Connected to **{SHEET_NAME}**")
+        st.success(f"✅ Connected to **{SHEET_NAME}** → new tab: **{tab_name}**")
 
 existing_ids = get_existing_ids(ws) if ws else set()
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("In Sheet",  len(existing_ids))
 c2.metric("Roles",     len(ROLES))
-c3.metric("Days Back", days_back)
+c3.metric("Country",   selected_country)
 c4.metric("Last Run",  st.session_state.get("last_run", "Never"))
 
 st.divider()
@@ -280,13 +307,13 @@ if run_btn:
 
     for role in ROLES:
         progress.progress(step / total_steps, text=f"Adzuna → {role}...")
-        jobs, err = fetch_adzuna(role)
+        jobs, err = fetch_adzuna(role, adzuna_country)
         log_lines.append(f"{'✅' if not err else '⚠️'} Adzuna / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
         all_jobs.extend(jobs)
         step += 1
 
         progress.progress(step / total_steps, text=f"JSearch → {role}...")
-        jobs, err = fetch_jsearch(role, days_back)
+        jobs, err = fetch_jsearch(role, days_back, jsearch_country)
         log_lines.append(f"{'✅' if not err else '⚠️'} JSearch / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
         all_jobs.extend(jobs)
         step += 1
