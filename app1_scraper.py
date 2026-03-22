@@ -31,7 +31,7 @@ st.markdown("""
 ADZUNA_ID  = "ac1a4ebd"
 ADZUNA_KEY = "b24bf85fcd6f5da0c1bf82d2d8ab5d30"
 
-# 2. JSEARCH — get free at https://rapidapi.com  → search JSearch → subscribe Basic
+# 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
 JSEARCH_KEY = "c878633452mshdf37c1410b3565bp18b884jsn05ae0b0654b8"
 
 # 3. GOOGLE SHEET — exact name of your sheet (case sensitive)
@@ -48,11 +48,12 @@ CREDS_JSON = """{
   "client_email": "nabhey@airy-gate-238512.iam.gserviceaccount.com",
   "client_id": "100136393772596802414",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token"
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "universe_domain": "googleapis.com"
 }"""
 
-# 5. ROLES TO SEARCH — add or remove as needed
-ROLES = [
+# 5. DEFAULT ROLES — user can change these in the app UI
+DEFAULT_ROLES = [
     "Product Manager",
     "Product Marketing Manager",
     "Growth Marketing Manager",
@@ -60,6 +61,9 @@ ROLES = [
 
 # 6. COUNTRIES — adzuna country codes: in=India, gb=UK, us=USA, au=Australia
 ADZUNA_COUNTRY = "in"
+
+# 7. DEFAULT DAYS BACK — user can change this in the app UI
+DEFAULT_DAYS_BACK = 3
 
 # ════════════════════════════════════════════════════════════════════════════════
 # ██  END OF CONFIG — do not edit below this line  ██████████████████████████  ██
@@ -127,7 +131,8 @@ def fetch_adzuna(role):
     except Exception as e:
         return [], str(e)
 
-def fetch_jsearch(role):
+def fetch_jsearch(role, days_back=3):
+    date_filter = "today" if days_back == 1 else f"{days_back}days" if days_back <= 7 else "month"
     try:
         r = requests.get(
             "https://jsearch.p.rapidapi.com/search",
@@ -139,7 +144,7 @@ def fetch_jsearch(role):
                 "query":      f"{role} India remote",
                 "page":       "1",
                 "num_pages":  "1",
-                "date_posted":"3days"
+                "date_posted": date_filter
             },
             timeout=10
         )
@@ -182,19 +187,58 @@ def save_jobs(ws, jobs, existing_ids):
 st.title("🔍 App 1 — Job Scraper")
 st.caption("Fetches jobs from Adzuna + JSearch and saves to Google Sheet.")
 
-# Config validation warnings
+# ── Sidebar — user inputs ─────────────────────────────────────────────────────
+with st.sidebar:
+    st.header("🔧 Search Settings")
+
+    st.subheader("Job Positions")
+    st.caption("Add or remove roles to search for")
+    roles_input = st.text_area(
+        "One role per line",
+        value="\n".join(DEFAULT_ROLES),
+        height=120,
+        label_visibility="collapsed"
+    )
+    ROLES = [r.strip() for r in roles_input.strip().split("\n") if r.strip()]
+
+    st.divider()
+    st.subheader("Days Back")
+    days_back = st.slider("Fetch jobs posted in last N days", 1, 30, DEFAULT_DAYS_BACK)
+
+    st.divider()
+    st.subheader("Google Sheet Name")
+    SHEET_NAME = st.text_input("Sheet name (case sensitive)", value=SHEET_NAME_DEFAULT)
+    st.markdown("""
+<div style="background:#0d1a00; border:1px solid #34d399; border-left:3px solid #34d399;
+     border-radius:6px; padding:12px; margin-top:8px; font-size:13px;">
+    <strong style="color:#34d399;">📋 Sheet Setup:</strong><br/><br/>
+    <span style="color:#a0aec0;">1. Create a Google Sheet with the name above</span><br/><br/>
+    <span style="color:#a0aec0;">2. Share it with <strong>Editor</strong> access to:</span><br/>
+    <div style="background:#0a0f00; border:1px solid #2a4a00; border-radius:4px;
+         padding:8px; margin-top:6px; word-break:break-all;">
+        <span style="color:#38bdf8; font-size:12px; font-weight:bold;">
+            nabhey@airy-gate-238512.iam.gserviceaccount.com
+        </span>
+    </div>
+    <span style="color:#4a6a4a; font-size:11px; margin-top:6px; display:block;">
+        Once shared, jobs will auto-save to this sheet on every run.
+    </span>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Config validation ─────────────────────────────────────────────────────────
 config_ok = True
 warnings = []
-if "PASTE_YOUR_ADZUNA_APP_ID_HERE"  in ADZUNA_ID:   warnings.append("Adzuna App ID not set")
-if "PASTE_YOUR_ADZUNA_APP_KEY_HERE" in ADZUNA_KEY:  warnings.append("Adzuna App Key not set")
-if "PASTE_YOUR_RAPIDAPI_KEY_HERE"   in JSEARCH_KEY: warnings.append("JSearch key not set")
-if "PASTE_YOUR_FULL_SERVICE"        in CREDS_JSON:  warnings.append("Service Account JSON not set")
+if "PASTE_YOUR_ADZUNA_APP_ID_HERE"  in ADZUNA_ID:  warnings.append("Adzuna App ID not set")
+if "PASTE_YOUR_ADZUNA_APP_KEY_HERE" in ADZUNA_KEY: warnings.append("Adzuna App Key not set")
+if "PASTE_YOUR_RAPIDAPI_KEY_HERE"   in JSEARCH_KEY:warnings.append("JSearch key not set")
+if "PASTE_YOUR_FULL_SERVICE"        in CREDS_JSON: warnings.append("Service Account JSON not set")
 
 if warnings:
-    st.warning(f"⚠️ Open `app1_scraper.py` and fill in the CONFIG section at the top: {', '.join(warnings)}")
+    st.warning(f"⚠️ Open `app1_scraper.py` → fill CONFIG section: {', '.join(warnings)}")
     config_ok = False
 
-# Sheet connection
+# ── Sheet connection ──────────────────────────────────────────────────────────
 ws, sheet_err = None, None
 if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
     ws, sheet_err = get_sheet()
@@ -202,50 +246,26 @@ if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
         st.error(f"Sheet error: {sheet_err}")
     else:
         st.success(f"✅ Connected to **{SHEET_NAME}**")
-elif config_ok:
-    st.markdown("""
-<div style="background:#0d1a00; border:1px solid #34d399; border-left:4px solid #34d399;
-     border-radius:8px; padding:16px; margin:8px 0;">
-    <strong style="color:#34d399;">📋 Google Sheet Setup — 2 steps:</strong><br/><br/>
-    <strong style="color:#e2e8f0;">Step 1:</strong>
-    <span style="color:#a0aec0;"> Create a new Google Sheet named exactly </span>
-    <code style="background:#1a2a00; color:#c8f135; padding:2px 8px; border-radius:4px;">Job Pipeline</code><br/><br/>
-    <strong style="color:#e2e8f0;">Step 2:</strong>
-    <span style="color:#a0aec0;"> Share that sheet with Editor access to:</span><br/>
-    <div style="background:#0a0f00; border:1px solid #2a4a00; border-radius:6px;
-         padding:10px 14px; margin-top:8px; font-family:monospace;">
-        <span style="color:#38bdf8; font-size:14px; font-weight:bold;">
-            nabhey@airy-gate-238512.iam.gserviceaccount.com
-        </span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
 
 existing_ids = get_existing_ids(ws) if ws else set()
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("In Sheet",  len(existing_ids))
 c2.metric("Roles",     len(ROLES))
-c3.metric("Sources",   "Adzuna + JSearch")
+c3.metric("Days Back", days_back)
 c4.metric("Last Run",  st.session_state.get("last_run", "Never"))
 
 st.divider()
 
-# Sidebar — read only info now, no inputs needed
-with st.sidebar:
-    st.header("ℹ️ Status")
-    st.markdown(f"**Sheet:** {SHEET_NAME}")
-    st.markdown(f"**Country:** {ADZUNA_COUNTRY.upper()}")
-    st.markdown("**Roles:**")
-    for r in ROLES:
-        st.markdown(f"- {r}")
-    st.divider()
-    st.caption("To change config, edit the top section of `app1_scraper.py`")
+if not ROLES:
+    st.error("Add at least one job role in the sidebar.")
+else:
+    st.markdown(f"**Searching for:** {' · '.join(ROLES)}")
 
 run_btn = st.button(
     "▶ Run Scraper",
     type="primary",
-    disabled=(not config_ok),
+    disabled=(not config_ok or not ROLES),
 )
 
 if run_btn:
@@ -263,7 +283,7 @@ if run_btn:
         step += 1
 
         progress.progress(step / total_steps, text=f"JSearch → {role}...")
-        jobs, err = fetch_jsearch(role)
+        jobs, err = fetch_jsearch(role, days_back)
         log_lines.append(f"{'✅' if not err else '⚠️'} JSearch / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
         all_jobs.extend(jobs)
         step += 1
@@ -283,7 +303,7 @@ if run_btn:
         st.session_state["last_run"] = datetime.now().strftime("%H:%M, %d %b")
         st.success(f"✅ Done — {len(deduped)} unique jobs, **{new_count} new** added to sheet.")
     else:
-        st.warning(f"Found {len(deduped)} jobs but Sheet not connected — add CREDS_JSON to save.")
+        st.warning(f"Found {len(deduped)} jobs but Sheet not connected — add CREDS_JSON in config to save.")
 
     progress.empty()
 
