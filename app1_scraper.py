@@ -23,21 +23,66 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-ROLES = ["Product Manager", "Product Marketing Manager", "Growth Marketing Manager"]
+# ════════════════════════════════════════════════════════════════════════════════
+# ██  CONFIGURE HERE — change these values, nothing else needs to be touched  ██
+# ════════════════════════════════════════════════════════════════════════════════
+
+# 1. ADZUNA — get free at https://developer.adzuna.com
+ADZUNA_ID  = "ac1a4ebd"
+ADZUNA_KEY = "b24bf85fcd6f5da0c1bf82d2d8ab5d30"
+
+# 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
+JSEARCH_KEY = "c878633452mshdf37c1410b3565bp18b884jsn05ae0b0654b8"
+
+# 3. GOOGLE SHEET — exact name of your sheet (case sensitive)
+SHEET_NAME = "Job Pipeline"
+
+# 4. SERVICE ACCOUNT JSON — paste the full JSON from GCP between the triple quotes
+#    Steps: console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
+#    Then share your Google Sheet with the client_email below (Editor access)
+CREDS_JSON = """
+PASTE_YOUR_FULL_SERVICE_ACCOUNT_JSON_HERE
+
+Example format:
+{
+  "type": "service_account",
+  "project_id": "airy-gate-238512",
+  "private_key_id": "51cf2f8c913a7f9c5a84daac96bebfe3ff5048db",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCkm3nqSAH1U+W9\nJsqvdUVWX4IBsdMSl/3zTXajWjzgBVZ/ID3VVevckHZ/Xy3Jo8Xi1LQIM2N3GnRD\nFmaIEi85VLkxmuicFcpZElkNnrXJ3PERvpjxYc5O4s+UVIuJl4Aj3rM9H0OqdzgS\nIPaokdxK7uzCLIQW0inl2Dxk0r4wkyh5vskD48HnXpcPnyMTKbuBvIP1Qneoe6jA\nkG1PnWqsYhqCdWwK2qJsruO+vI4bLjFEd9TkZVyaJ+QxAiIJ0cGf61qkVQCxCW7l\nhhC0dlVwGlVs8Gix3pZLyaJfpu16hKi5zF2RPPCpDcsuwZaXqLmyJIBycshQxrHR\nzLr6jikHAgMBAAECggEAI57ZhQ9MDTC4mHQajFmORaCpW4CFspJdjBcJQ1Q1tCyz\niRMLDm1nevVwDyQjnmzoV6u7wcKNFasN2a6xRWTZ/0gMQ2XITG6SuS+1QbNEl4hO\nSo66PhHyOTPvw6OABqhYPGrm0qU/WVYvNg0YE2ZtC3IknehQNTgJhQmEGDVantwA\njzm/mmS+hFQ3bpz6xXAGsFZVhjeCLw86VJ+MOG1sl5s3iU8CuTi/dVRD4X36r5Kg\ntD+ie2T4c0Tig9FemfPNAhp/dXXs3hMTmMkGmY0BLfcL7ZSCF/MJIbefYN/1QEpM\noNhtj/7M1NXo5nLaHXJ5VBKfxS10ey5fmRyszGUNsQKBgQDVUU5h/j1GNL2ZT68P\nEGNFrRXzFozF+C/aynHas7T6zgSzvqE8RbX0lnIWg9Nn6tmGJPs1kpRSuUsebm5p\nhsDubC5OHbCaCggaPfa66XA9JeHR7j6YcGz4Zt+azJUWhXLSL/QKSgasR7td1N5m\nWB8M+Qw9OLDcEUn24jn1x8Tj1QKBgQDFixm+D8nrRR4ylpftjfh1m4TG3mb7+f26\nCSW95ViWerC9lL3pOO6odM2MnJsFYUwt8PHw5ErsDb/SkEn04w3PqnN7EkKYLzgs\n+xbD5OFLLSeMLydeKix2NFM/V9/MxaO/A+xax57gRo6T+VGdV+VlaViZcOY/am7s\n1pXy66GzawKBgFTAZvn7/vBDyAh/Zjf/9NEcAZqBHRESmEC/KhkQSRlUfP3FAV5m\n+/HfTBix625gGmh3jO8t+4waXkQK8AcxKLoRdRxII4Av+CQk9kAwuw0wXdYAaBI8\nqK7QgIqKObmm74We08C6xIfyP/j5uBrFbCDFWh2AxpPIsrBKFWkXI5y5AoGAaGBr\nJaWqBwnqPsibVgWhtmKJ8ZopyBH7IoUa0A+Sk1AYetNQ1R4j3BZ7VUSaFGmoms2o\nyKOXgspxBI0AxsgB0Cw8AFdRoJ+yivHQwYj6EYK2VrfDkVmvTHWxVtLTiZsUPiWQ\niRbYt6AQTdd6bCy5JLBZBBpHTlKqcbGgYU5njikCgYBhVjeOZF0xFDKbSkCOJA2z\n30NyW/PPNabm++T1tUlQSyCttGcgX7CpMUXhyYiKSAL72Mw+tAr2qudggSyl1PMn\nTZg7Tv51cnNnUM01RAKrDCn33PfIdnU1mUG20EDRUcIvH7jN+MTbmCN9J6UxIjHC\nj/dbbQ1r1LnhO2KOrcGH2A==\n-----END PRIVATE KEY-----\n",
+  "client_email": "nabhey@airy-gate-238512.iam.gserviceaccount.com",
+  "client_id": "100136393772596802414",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token"
+}
+"""
+
+# 5. ROLES TO SEARCH — add or remove as needed
+ROLES = [
+    "Product Manager",
+    "Product Marketing Manager",
+    "Growth Marketing Manager",
+]
+
+# 6. COUNTRIES — adzuna country codes: in=India, gb=UK, us=USA, au=Australia
+ADZUNA_COUNTRY = "in"
+
+# ════════════════════════════════════════════════════════════════════════════════
+# ██  END OF CONFIG — do not edit below this line  ██████████████████████████  ██
+# ════════════════════════════════════════════════════════════════════════════════
 
 def job_id(title, company):
     return hashlib.md5(f"{title}{company}".lower().encode()).hexdigest()[:8]
 
-def get_sheet(creds_json_str, sheet_name):
+def get_sheet():
     try:
-        creds_dict = json.loads(creds_json_str)
+        creds_dict = json.loads(CREDS_JSON)
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive",
         ]
         creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
-        sh     = client.open(sheet_name)
+        sh     = client.open(SHEET_NAME)
         try:
             ws = sh.worksheet("Jobs")
         except gspread.WorksheetNotFound:
@@ -49,7 +94,7 @@ def get_sheet(creds_json_str, sheet_name):
             ])
         return ws, None
     except json.JSONDecodeError:
-        return None, "Invalid JSON — paste the full service account JSON"
+        return None, "CREDS_JSON is not valid JSON — check the format in config section"
     except Exception as e:
         return None, str(e)
 
@@ -60,10 +105,10 @@ def get_existing_ids(ws):
     except:
         return set()
 
-def fetch_adzuna(role, app_id, app_key):
+def fetch_adzuna(role):
     url = (
-        f"https://api.adzuna.com/v1/api/jobs/in/search/1"
-        f"?app_id={app_id}&app_key={app_key}"
+        f"https://api.adzuna.com/v1/api/jobs/{ADZUNA_COUNTRY}/search/1"
+        f"?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}"
         f"&results_per_page=10&what={requests.utils.quote(role)}"
         f"&content-type=application/json"
     )
@@ -87,12 +132,20 @@ def fetch_adzuna(role, app_id, app_key):
     except Exception as e:
         return [], str(e)
 
-def fetch_jsearch(role, api_key):
+def fetch_jsearch(role):
     try:
         r = requests.get(
             "https://jsearch.p.rapidapi.com/search",
-            headers={"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": "jsearch.p.rapidapi.com"},
-            params={"query": f"{role} India remote", "page":"1","num_pages":"1","date_posted":"3days"},
+            headers={
+                "X-RapidAPI-Key":  JSEARCH_KEY,
+                "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+            },
+            params={
+                "query":      f"{role} India remote",
+                "page":       "1",
+                "num_pages":  "1",
+                "date_posted":"3days"
+            },
             timeout=10
         )
         r.raise_for_status()
@@ -134,92 +187,94 @@ def save_jobs(ws, jobs, existing_ids):
 st.title("🔍 App 1 — Job Scraper")
 st.caption("Fetches jobs from Adzuna + JSearch and saves to Google Sheet.")
 
-with st.sidebar:
-    st.header("⚙️ Setup")
+# Config validation warnings
+config_ok = True
+warnings = []
+if "PASTE_YOUR_ADZUNA_APP_ID_HERE"  in ADZUNA_ID:   warnings.append("Adzuna App ID not set")
+if "PASTE_YOUR_ADZUNA_APP_KEY_HERE" in ADZUNA_KEY:  warnings.append("Adzuna App Key not set")
+if "PASTE_YOUR_RAPIDAPI_KEY_HERE"   in JSEARCH_KEY: warnings.append("JSearch key not set")
+if "PASTE_YOUR_FULL_SERVICE"        in CREDS_JSON:  warnings.append("Service Account JSON not set")
 
-    st.subheader("API Keys")
-    adzuna_id   = st.text_input("Adzuna App ID",       type="password", placeholder="developer.adzuna.com")
-    adzuna_key  = st.text_input("Adzuna App Key",      type="password")
-    jsearch_key = st.text_input("JSearch RapidAPI Key",type="password", placeholder="rapidapi.com → JSearch")
-
-    st.divider()
-    st.subheader("Google Sheet")
-    sheet_name = st.text_input("Sheet Name", value="Job Pipeline")
-    st.caption("Paste your full service account JSON below")
-    creds_json = st.text_area(
-        "Service Account JSON",
-        height=160,
-        placeholder='{\n  "type": "service_account",\n  "project_id": "...",\n  "private_key": "...",\n  "client_email": "..@..iam.gserviceaccount.com"\n}',
-        label_visibility="collapsed"
-    )
-
-    st.divider()
-    st.subheader("Search Settings")
-    selected_roles = st.multiselect("Roles", ROLES, default=ROLES)
-    sources = st.multiselect("Sources", ["Adzuna", "JSearch"], default=["Adzuna", "JSearch"])
-
-    with st.expander("How to get service account JSON"):
-        st.markdown("""
-1. [console.cloud.google.com](https://console.cloud.google.com) → New project
-2. Enable **Google Sheets API** + **Google Drive API**
-3. IAM → Service Accounts → Create → download JSON key
-4. Open JSON file → copy all → paste above
-5. Create Google Sheet named **"Job Pipeline"**
-6. Share sheet with the `client_email` from JSON (Editor)
-        """)
+if warnings:
+    st.warning(f"⚠️ Open `app1_scraper.py` and fill in the CONFIG section at the top: {', '.join(warnings)}")
+    config_ok = False
 
 # Sheet connection
 ws, sheet_err = None, None
-if creds_json.strip():
-    ws, sheet_err = get_sheet(creds_json, sheet_name)
+if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
+    ws, sheet_err = get_sheet()
     if sheet_err:
         st.error(f"Sheet error: {sheet_err}")
     else:
-        st.success(f"Connected to **{sheet_name}**")
-else:
-    st.info("Paste your Service Account JSON in the sidebar to connect Google Sheet.")
+        st.success(f"✅ Connected to **{SHEET_NAME}**")
+elif config_ok:
+    st.markdown("""
+<div style="background:#0d1a00; border:1px solid #34d399; border-left:4px solid #34d399;
+     border-radius:8px; padding:16px; margin:8px 0;">
+    <strong style="color:#34d399;">📋 Google Sheet Setup — 2 steps:</strong><br/><br/>
+    <strong style="color:#e2e8f0;">Step 1:</strong>
+    <span style="color:#a0aec0;"> Create a new Google Sheet named exactly </span>
+    <code style="background:#1a2a00; color:#c8f135; padding:2px 8px; border-radius:4px;">Job Pipeline</code><br/><br/>
+    <strong style="color:#e2e8f0;">Step 2:</strong>
+    <span style="color:#a0aec0;"> Share that sheet with Editor access to:</span><br/>
+    <div style="background:#0a0f00; border:1px solid #2a4a00; border-radius:6px;
+         padding:10px 14px; margin-top:8px; font-family:monospace;">
+        <span style="color:#38bdf8; font-size:14px; font-weight:bold;">
+            nabhey@airy-gate-238512.iam.gserviceaccount.com
+        </span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 existing_ids = get_existing_ids(ws) if ws else set()
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("In Sheet",  len(existing_ids))
-c2.metric("Roles",     len(selected_roles))
-c3.metric("Sources",   len(sources))
+c2.metric("Roles",     len(ROLES))
+c3.metric("Sources",   "Adzuna + JSearch")
 c4.metric("Last Run",  st.session_state.get("last_run", "Never"))
 
 st.divider()
 
-missing = []
-if "Adzuna" in sources and (not adzuna_id or not adzuna_key): missing.append("Adzuna keys")
-if "JSearch" in sources and not jsearch_key: missing.append("JSearch key")
-if not creds_json.strip(): missing.append("Service Account JSON")
-if missing:
-    st.warning(f"Fill in sidebar first: {', '.join(missing)}")
+# Sidebar — read only info now, no inputs needed
+with st.sidebar:
+    st.header("ℹ️ Status")
+    st.markdown(f"**Sheet:** {SHEET_NAME}")
+    st.markdown(f"**Country:** {ADZUNA_COUNTRY.upper()}")
+    st.markdown("**Roles:**")
+    for r in ROLES:
+        st.markdown(f"- {r}")
+    st.divider()
+    st.caption("To change config, edit the top section of `app1_scraper.py`")
 
-run_btn = st.button("▶ Run Scraper", type="primary", disabled=not ws)
+run_btn = st.button(
+    "▶ Run Scraper",
+    type="primary",
+    disabled=(not config_ok),
+)
 
 if run_btn:
     all_jobs, log_lines = [], []
-    total_steps = max(len(selected_roles) * len(sources), 1)
+    sources = ["Adzuna", "JSearch"]
+    total_steps = max(len(ROLES) * len(sources), 1)
     step = 0
     progress = st.progress(0, text="Starting...")
 
-    for role in selected_roles:
-        if "Adzuna" in sources:
-            progress.progress(step / total_steps, text=f"Adzuna → {role}...")
-            jobs, err = fetch_adzuna(role, adzuna_id, adzuna_key)
-            log_lines.append(f"{'✅' if not err else '⚠️'} Adzuna / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
-            all_jobs.extend(jobs)
-            step += 1
+    for role in ROLES:
+        progress.progress(step / total_steps, text=f"Adzuna → {role}...")
+        jobs, err = fetch_adzuna(role)
+        log_lines.append(f"{'✅' if not err else '⚠️'} Adzuna / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
+        all_jobs.extend(jobs)
+        step += 1
 
-        if "JSearch" in sources:
-            progress.progress(step / total_steps, text=f"JSearch → {role}...")
-            jobs, err = fetch_jsearch(role, jsearch_key)
-            log_lines.append(f"{'✅' if not err else '⚠️'} JSearch / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
-            all_jobs.extend(jobs)
-            step += 1
-            time.sleep(0.5)
+        progress.progress(step / total_steps, text=f"JSearch → {role}...")
+        jobs, err = fetch_jsearch(role)
+        log_lines.append(f"{'✅' if not err else '⚠️'} JSearch / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
+        all_jobs.extend(jobs)
+        step += 1
+        time.sleep(0.5)
 
+    # Dedupe
     seen, deduped = {}, []
     for j in all_jobs:
         if j["id"] not in seen:
@@ -227,11 +282,15 @@ if run_btn:
             deduped.append(j)
 
     progress.progress(1.0, text="Saving to sheet...")
-    new_count = save_jobs(ws, deduped, existing_ids)
-    progress.empty()
 
-    st.session_state["last_run"] = datetime.now().strftime("%H:%M, %d %b")
-    st.success(f"Done — {len(deduped)} unique jobs found, **{new_count} new** added to sheet.")
+    if ws:
+        new_count = save_jobs(ws, deduped, existing_ids)
+        st.session_state["last_run"] = datetime.now().strftime("%H:%M, %d %b")
+        st.success(f"✅ Done — {len(deduped)} unique jobs, **{new_count} new** added to sheet.")
+    else:
+        st.warning(f"Found {len(deduped)} jobs but Sheet not connected — add CREDS_JSON to save.")
+
+    progress.empty()
 
     with st.expander("Run Log", expanded=True):
         for line in log_lines:
@@ -240,7 +299,7 @@ if run_btn:
     if deduped:
         st.subheader(f"Jobs Found ({len(deduped)})")
         for job in deduped[:20]:
-            already = job["id"] in (existing_ids - {job["id"]})
+            already = job["id"] in existing_ids
             st.markdown(f"""
             <div class="job-card">
                 <strong>{job['title']}</strong> &nbsp;
