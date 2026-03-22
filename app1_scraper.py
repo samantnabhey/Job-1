@@ -176,6 +176,8 @@ if creds_json.strip():
         st.error(f"Sheet error: {sheet_err}")
     else:
         st.success(f"Connected to **{sheet_name}**")
+else:
+    st.info("Paste your Service Account JSON in the sidebar to connect Google Sheet.")
 
 existing_ids = get_existing_ids(ws) if ws else set()
 
