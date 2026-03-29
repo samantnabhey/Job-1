@@ -16,13 +16,13 @@ st.markdown("""
         background: #0f0f1a; border: 1px solid #1e1e30;
         border-radius: 8px; padding: 16px; margin-bottom: 10px;
     }
-    .score-high { color: #34d399; font-weight: bold; font-size: 18px; }
-    .score-mid  { color: #fbbf24; font-weight: bold; font-size: 18px; }
-    .score-low  { color: #f87171; font-weight: bold; font-size: 18px; }
+    .score-high  { color: #34d399; font-weight: bold; font-size: 18px; }
+    .score-mid   { color: #fbbf24; font-weight: bold; font-size: 18px; }
+    .score-low   { color: #f87171; font-weight: bold; font-size: 18px; }
     .tag         { background:#1e1e30; color:#6868a8; padding:2px 10px; border-radius:20px; font-size:12px; margin-right:5px; }
     .refined-tag { background:#0d1a00; color:#34d399; padding:2px 10px; border-radius:20px; font-size:12px; }
     .good-tag    { background:#0d1020; color:#38bdf8; padding:2px 10px; border-radius:20px; font-size:12px; }
-    h1, h2, h3 { color: #38bdf8 !important; }
+    h1, h2, h3  { color: #38bdf8 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -30,8 +30,8 @@ st.markdown("""
 # ██  CONFIGURE HERE                                                          ██
 # ════════════════════════════════════════════════════════════════════════════════
 
-# 1. GEMINI API KEY — free at https://aistudio.google.com → Get API Key
-GEMINI_KEY = "AIzaSyBk_heOWnxQSs4ZDrvfePvcj4ZLsDnu_Bs"
+# 1. GROQ API KEY — free at https://console.groq.com → API Keys → Create
+GROQ_KEY = "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"
 
 # 2. SAME SERVICE ACCOUNT JSON as App 1
 CREDS_JSON = """
@@ -46,27 +46,40 @@ CREDS_JSON = """
   "token_uri": "https://oauth2.googleapis.com/token"
 }"""
 
-# 3. SCORE THRESHOLD — refine resume only if below this
+# 3. SCORE THRESHOLD — refine resume only if score below this
 SCORE_THRESHOLD = 70
 
 # ════════════════════════════════════════════════════════════════════════════════
 # ██  END CONFIG                                                              ██
 # ════════════════════════════════════════════════════════════════════════════════
 
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_KEY}"
+GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
-def gemini(prompt, max_tokens=1500):
-    """Call Gemini API."""
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3}
+def groq(prompt, max_tokens=1500):
+    """Call Groq API — free, fast, no quota issues."""
+    headers = {
+        "Authorization": f"Bearer {GROQ_KEY}",
+        "Content-Type":  "application/json"
     }
-    try:
-        r = requests.post(GEMINI_URL, json=body, timeout=30)
-        r.raise_for_status()
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception as e:
-        raise Exception(f"Gemini error: {e}")
+    body = {
+        "model":       GROQ_MODEL,
+        "max_tokens":  max_tokens,
+        "temperature": 0.3,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    for attempt in range(3):
+        try:
+            r = requests.post(GROQ_URL, headers=headers, json=body, timeout=30)
+            if r.status_code == 429:
+                time.sleep(10 * (attempt + 1))
+                continue
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            if attempt == 2:
+                raise Exception(f"Groq error: {e}")
+            time.sleep(5)
 
 def get_gspread_client():
     fixed = CREDS_JSON
@@ -98,12 +111,11 @@ def update_row(ws, row_num, score, verdict, tailored_resume, status):
         ws.update_cell(row_num, 13, score)
         ws.update_cell(row_num, 14, verdict)
         ws.update_cell(row_num, 15, tailored_resume[:40000] if tailored_resume else "")
-        time.sleep(5)
+        time.sleep(0.5)
     except Exception as e:
         st.warning(f"Row {row_num} update error: {e}")
 
 def score_job(resume, job_title, company, jd):
-    """Score resume vs JD. Returns dict with score, verdict, gap_reasons."""
     prompt = f"""You are a resume-job match analyser.
 Return ONLY valid JSON, no markdown, no explanation.
 Format: {{"score": 0-100, "verdict": "Strong Match or Good Match or Weak Match", "gap_reasons": ["reason1","reason2"]}}
@@ -115,18 +127,17 @@ RESUME:
 {resume[:1500]}
 
 Return only JSON."""
-    raw = gemini(prompt, max_tokens=300)
+    raw   = groq(prompt, max_tokens=300)
     clean = raw.replace("```json","").replace("```","").strip()
     return json.loads(clean)
 
 def refine_resume(resume, job_title, company, jd, gap_reasons):
-    """Refine resume for this specific job. Only called if score < threshold."""
     prompt = f"""You are an expert resume writer for PM and Growth roles.
-The applicant is Nabhey — Product Analyst based in Goa, India, targeting MNC remote/hybrid roles.
+The applicant is Nabhey — Product Analyst, Goa India, targeting MNC remote/hybrid roles.
 
-Rewrite the resume below to maximise match with the job.
+Rewrite the resume to maximise match with this job.
 Address the gaps listed. Stay truthful — do not invent experience.
-Return ONLY the full refined resume as plain text. No JSON, no markdown.
+Return ONLY the full refined resume as plain text. No JSON, no markdown headers.
 
 JOB: {job_title} at {company}
 JD: {jd[:800]}
@@ -138,11 +149,11 @@ ORIGINAL RESUME:
 {resume}
 
 Return the full refined resume as plain text."""
-    return gemini(prompt, max_tokens=1500)
+    return groq(prompt, max_tokens=1500)
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 st.title("🧠 App 2 — Resume Matcher & Refiner")
-st.caption("Scores each job vs your resume. Refines resume if score < threshold.")
+st.caption("Scores each job vs your resume using Groq (free). Refines resume if score < threshold.")
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -167,7 +178,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Your Base Resume")
-    st.caption("Paste once — Claude refines it per job below threshold")
+    st.caption("Paste once — Groq AI refines it per job below threshold")
     resume_text = st.text_area(
         "resume",
         height=300,
@@ -182,24 +193,23 @@ with st.sidebar:
         "Refine if score below (%)",
         min_value=40, max_value=90,
         value=SCORE_THRESHOLD,
-        help="Jobs below this score get a tailored resume"
     )
-    st.caption(f"Jobs ≥ {threshold}% → Good Match (no refine)\nJobs < {threshold}% → Resume refined")
+    st.caption(f"≥ {threshold}% → Good Match\n< {threshold}% → Resume refined")
 
     st.divider()
-    with st.expander("📖 Gemini API Key Setup"):
+    with st.expander("📖 Groq API Key Setup"):
         st.markdown("""
-1. Go to [aistudio.google.com](https://aistudio.google.com)
-2. Sign in with Google
-3. Click **Get API Key → Create API Key**
-4. Copy key → paste in `GEMINI_KEY` in config section
-5. Free tier: 15 requests/min, 1500 requests/day
+1. Go to [console.groq.com](https://console.groq.com)
+2. Sign up with GitHub (free, no card)
+3. **API Keys → Create API Key**
+4. Copy key → paste in `GROQ_KEY` in config section
+5. Free tier: very generous, no daily cap issues
         """)
 
 # ── Config check ──────────────────────────────────────────────────────────────
 config_ok = True
-if "PASTE_YOUR_GEMINI_API_KEY_HERE" in GEMINI_KEY:
-    st.warning("⚠️ Add Gemini API key in CONFIG section of `app2_matcher.py` — free at aistudio.google.com")
+if "PASTE_YOUR_GROQ_API_KEY_HERE" in GROQ_KEY:
+    st.warning("⚠️ Add Groq API key in CONFIG section — free at console.groq.com")
     config_ok = False
 if "PASTE_YOUR_FULL_SERVICE" in CREDS_JSON:
     st.warning("⚠️ Add Service Account JSON in CONFIG section — same as App 1")
@@ -219,19 +229,18 @@ if tab_name and "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON:
 
 new_jobs = [r for r in rows if str(r.get("Status","")).strip() == "New"]
 
-# Stats
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Jobs",    len(rows))
-c2.metric("Pending",       len(new_jobs))
-c3.metric("Threshold",     f"{threshold}%")
-c4.metric("Last Run",      st.session_state.get("last_run_2", "Never"))
+c1.metric("Total Jobs", len(rows))
+c2.metric("Pending",    len(new_jobs))
+c3.metric("Threshold",  f"{threshold}%")
+c4.metric("Last Run",   st.session_state.get("last_run_2", "Never"))
 
 st.divider()
 
 if rows and not new_jobs:
     st.success("✅ All jobs already processed in this tab!")
 elif new_jobs:
-    st.markdown(f"**{len(new_jobs)} new jobs** to process from tab **{tab_name}**")
+    st.markdown(f"**{len(new_jobs)} new jobs** ready to process from tab **{tab_name}**")
 
 run_btn = st.button(
     "▶ Run Matcher",
@@ -249,10 +258,10 @@ if run_btn:
         title   = job.get("Title", "Unknown")
         company = job.get("Company", "Unknown")
         jd      = job.get("JD Summary", "")
-        row_num = i + 2  # +2 accounts for header row
+        row_num = i + 2
 
-        # ── Step 1: Score ──
-        progress.progress(i / total, text=f"📊 Scoring: {title[:30]} @ {company}...")
+        # Step 1 — Score
+        progress.progress(i / total, text=f"📊 Scoring: {title[:35]} @ {company}...")
         try:
             score_data  = score_job(resume_text, title, company, jd)
             score       = int(score_data.get("score", 0))
@@ -262,10 +271,10 @@ if run_btn:
             st.warning(f"⚠️ Score failed — {title}: {e}")
             continue
 
-        # ── Step 2: Refine only if below threshold ──
+        # Step 2 — Refine only if below threshold
         tailored = ""
         if score < threshold:
-            progress.progress(i / total, text=f"✍️ Refining resume for: {title[:30]}...")
+            progress.progress(i / total, text=f"✍️ Refining: {title[:35]}...")
             try:
                 tailored = refine_resume(resume_text, title, company, jd, gap_reasons)
                 status   = "Refined"
@@ -275,7 +284,6 @@ if run_btn:
         else:
             status = "Good Match"
 
-        # ── Update sheet ──
         update_row(ws, row_num, score, verdict, tailored, status)
 
         results.append({
@@ -287,11 +295,10 @@ if run_btn:
             "refined": bool(tailored),
         })
 
-        time.sleep(150)  # respect Gemini free tier rate limit
+        time.sleep(250)  # Groq is fast, small delay is enough
 
     progress.progress(1.0, text="All done!")
     progress.empty()
-
     st.session_state["last_run_2"] = datetime.now().strftime("%H:%M, %d %b")
 
     refined_count = sum(1 for r in results if r["refined"])
@@ -300,9 +307,9 @@ if run_btn:
 
     st.subheader("Results")
     for r in results:
-        sc   = r["score"]
-        cls  = "score-high" if sc >= 70 else "score-mid" if sc >= 50 else "score-low"
-        tag  = '<span class="refined-tag">✨ Refined</span>' if r["refined"] else '<span class="good-tag">✓ Good Match</span>'
+        sc  = r["score"]
+        cls = "score-high" if sc >= 70 else "score-mid" if sc >= 50 else "score-low"
+        tag = '<span class="refined-tag">✨ Refined</span>' if r["refined"] else '<span class="good-tag">✓ Good Match</span>'
         st.markdown(f"""
         <div class="job-card">
             <strong>{r['title']}</strong> — {r['company']} &nbsp; {tag}<br/>
@@ -310,7 +317,7 @@ if run_btn:
             <span style="color:#6868a8;font-size:13px;margin-left:8px;">{r['verdict']}</span>
         </div>""", unsafe_allow_html=True)
 
-# ── Show previously processed ─────────────────────────────────────────────────
+# ── Previously processed ──────────────────────────────────────────────────────
 if rows and not run_btn:
     done = [r for r in rows if r.get("Status","") not in ("New","")]
     if done:
