@@ -53,7 +53,7 @@ SCORE_THRESHOLD = 70
 # ██  END CONFIG                                                              ██
 # ════════════════════════════════════════════════════════════════════════════════
 
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_KEY}"
 
 def gemini(prompt, max_tokens=1500):
     """Call Gemini API."""
