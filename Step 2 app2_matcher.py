@@ -287,7 +287,7 @@ if run_btn:
             "refined": bool(tailored),
         })
 
-        time.sleep(15)  # respect Gemini free tier rate limit
+        time.sleep(150)  # respect Gemini free tier rate limit
 
     progress.progress(1.0, text="All done!")
     progress.empty()
