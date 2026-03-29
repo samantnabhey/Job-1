@@ -1,312 +1,361 @@
 import streamlit as st
+import requests
 import gspread
 from google.oauth2.service_account import Credentials
-from datetime import datetime
+from datetime import datetime, date
 import json
 import time
+import hashlib
 import re
-import anthropic
 
-st.set_page_config(page_title="App 2 — Resume Matcher", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="App 1 — Job Scraper", page_icon="🔍", layout="wide")
 
 st.markdown("""
 <style>
     .stApp { background: #0a0a0f; color: #e2e8f0; }
     .job-card {
         background: #0f0f1a; border: 1px solid #1e1e30;
-        border-radius: 8px; padding: 16px; margin-bottom: 10px;
+        border-left: 3px solid #38bdf8; border-radius: 8px;
+        padding: 14px 16px; margin-bottom: 10px;
     }
-    .score-high { color: #34d399; font-weight: bold; font-size: 18px; }
-    .score-mid  { color: #fbbf24; font-weight: bold; font-size: 18px; }
-    .score-low  { color: #f87171; font-weight: bold; font-size: 18px; }
     .tag { background:#1e1e30; color:#6868a8; padding:2px 10px; border-radius:20px; font-size:12px; margin-right:5px; }
-    .refined-tag { background:#0d1a00; color:#34d399; padding:2px 10px; border-radius:20px; font-size:12px; }
-    .skipped-tag { background:#1a0d00; color:#fbbf24; padding:2px 10px; border-radius:20px; font-size:12px; }
+    .new-tag { background:#052016; color:#34d399; padding:2px 10px; border-radius:20px; font-size:12px; }
     h1, h2, h3 { color: #38bdf8 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════════════════
-# ██  CONFIGURE HERE                                                          ██
+# ██  CONFIGURE HERE — change these values, nothing else needs to be touched  ██
 # ════════════════════════════════════════════════════════════════════════════════
 
-ANTHROPIC_KEY = "PASTE_YOUR_ANTHROPIC_API_KEY_HERE"
-# Get free at: https://console.anthropic.com → API Keys
+# 1. ADZUNA — get free at https://developer.adzuna.com
+ADZUNA_ID  = "PASTE_YOUR_ADZUNA_APP_ID_HERE"
+ADZUNA_KEY = "PASTE_YOUR_ADZUNA_APP_KEY_HERE"
 
+# 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
+JSEARCH_KEY = "PASTE_YOUR_RAPIDAPI_KEY_HERE"
+
+# 3. SERVICE ACCOUNT JSON — paste full JSON from GCP between the triple quotes
+#    console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
 CREDS_JSON = """
 PASTE_YOUR_FULL_SERVICE_ACCOUNT_JSON_HERE
 """
 
-SCORE_THRESHOLD = 70  # Refine resume only if score < this
+# 4. DEFAULT ROLES — user can change in the app sidebar
+DEFAULT_ROLES = [
+    "Product Manager",
+    "Product Marketing Manager",
+    "Growth Marketing Manager",
+]
+
+# 5. DEFAULT DAYS BACK — user can change in the app sidebar
+DEFAULT_DAYS_BACK = 3
+
+# 6. COUNTRY MAP
+COUNTRY_MAP = {
+    "India":     {"adzuna": "in",  "jsearch": "India"},
+    "UK":        {"adzuna": "gb",  "jsearch": "United Kingdom"},
+    "USA":       {"adzuna": "us",  "jsearch": "United States"},
+    "Australia": {"adzuna": "au",  "jsearch": "Australia"},
+    "Remote":    {"adzuna": "in",  "jsearch": "remote"},
+}
 
 # ════════════════════════════════════════════════════════════════════════════════
-# ██  END CONFIG                                                              ██
+# ██  END OF CONFIG — do not edit below this line  ████████████████████████████ ██
 # ════════════════════════════════════════════════════════════════════════════════
 
-def get_gspread_client():
-    fixed = CREDS_JSON
-    def fix_key(m):
-        inner = m.group(1).replace('\n', '\\n')
-        return f'"private_key": "{inner}"'
-    fixed = re.sub(r'"private_key":\s*"(.*?)"(?=\s*,)', fix_key, fixed, flags=re.DOTALL)
-    creds_dict = json.loads(fixed)
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-    return gspread.authorize(creds)
+def job_id(title, company):
+    return hashlib.md5(f"{title}{company}".lower().encode()).hexdigest()[:8]
 
-def load_jobs(sheet_name, tab_name):
-    """Load all rows from selected tab."""
+def get_sheet(sheet_name, roles):
     try:
-        client = get_gspread_client()
+        fixed = CREDS_JSON
+        def fix_key(m):
+            inner = m.group(1).replace('\n', '\\n')
+            return f'"private_key": "{inner}"'
+        fixed = re.sub(r'"private_key":\s*"(.*?)"(?=\s*,)', fix_key, fixed, flags=re.DOTALL)
+        creds_dict = json.loads(fixed)
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+        creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
         sh     = client.open(sheet_name)
-        ws     = sh.worksheet(tab_name)
-        rows   = ws.get_all_records()
-        return ws, rows, None
-    except Exception as e:
-        return None, [], str(e)
 
-def update_row(ws, row_num, score, verdict, tailored_resume, status):
-    """Update columns M(13), N(14), O(15), L(12) for a given row."""
+        # New worksheet name: first role first 20 chars + date
+        tab_label = roles[0][:20].strip() if roles else "Run"
+        tab_name  = f"{tab_label} {date.today().strftime('%d%b')}"
+
+        # Create fresh tab for this run
+        try:
+            # Delete if same name exists today (re-run)
+            existing = sh.worksheet(tab_name)
+            sh.del_worksheet(existing)
+        except gspread.WorksheetNotFound:
+            pass
+
+        ws = sh.add_worksheet(title=tab_name, rows=1000, cols=20)
+        ws.append_row([
+            "ID", "Date Added", "Title", "Company", "Location",
+            "Source", "Role", "Salary", "URL", "JD Summary",
+            "Remote", "Status", "Match Score", "Verdict"
+        ])
+        return ws, None, tab_name
+    except json.JSONDecodeError as e:
+        return None, f"JSON Error: {str(e)}", None
+    except Exception as e:
+        return None, str(e), None
+
+def get_existing_ids(ws):
     try:
-        ws.update_cell(row_num, 12, status)          # L — Status
-        ws.update_cell(row_num, 13, score)           # M — Match Score
-        ws.update_cell(row_num, 14, verdict)         # N — Verdict
-        ws.update_cell(row_num, 15, tailored_resume) # O — Tailored Resume
-        time.sleep(0.4)
+        ids = ws.col_values(1)
+        return set(ids[1:])
+    except:
+        return set()
+
+def fetch_adzuna(role, country_code="in"):
+    url = (
+        f"https://api.adzuna.com/v1/api/jobs/{country_code}/search/1"
+        f"?app_id={ADZUNA_ID}&app_key={ADZUNA_KEY}"
+        f"&results_per_page=10&what={requests.utils.quote(role)}"
+        f"&content-type=application/json"
+    )
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        jobs = []
+        for j in r.json().get("results", []):
+            jobs.append({
+                "id":      job_id(j.get("title",""), j.get("company",{}).get("display_name","")),
+                "title":   j.get("title",""),
+                "company": j.get("company",{}).get("display_name","Unknown"),
+                "location":j.get("location",{}).get("display_name","India"),
+                "source":  "Adzuna", "role": role,
+                "salary":  f"Rs.{int(j['salary_min']/100000)}L+" if j.get("salary_min") else "",
+                "url":     j.get("redirect_url",""),
+                "jd":      j.get("description","")[:500],
+                "remote":  "remote" in j.get("description","").lower(),
+            })
+        return jobs, None
     except Exception as e:
-        st.warning(f"Row update error: {e}")
+        return [], str(e)
 
-def score_job(client, resume, job_title, company, jd):
-    """Step 1 — just score, no refinement yet."""
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=300,
-        system="""You are a resume-job match analyser. 
-Return ONLY valid JSON, no markdown, no explanation.
-Format: {"score": 0-100, "verdict": "Strong Match"|"Good Match"|"Weak Match", "gap_reasons": ["reason1","reason2"]}""",
-        messages=[{
-            "role": "user",
-            "content": f"""Score this resume against the job.
+def fetch_jsearch(role, days_back=3, country_name="India"):
+    date_filter = "today" if days_back == 1 else f"{days_back}days" if days_back <= 7 else "month"
+    query = f"{role} {country_name}" if country_name != "remote" else f"{role} remote"
+    try:
+        r = requests.get(
+            "https://jsearch.p.rapidapi.com/search",
+            headers={
+                "X-RapidAPI-Key":  JSEARCH_KEY,
+                "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+            },
+            params={
+                "query":      query,
+                "page":       "1",
+                "num_pages":  "1",
+                "date_posted": date_filter
+            },
+            timeout=10
+        )
+        r.raise_for_status()
+        jobs = []
+        for j in r.json().get("data", [])[:8]:
+            jobs.append({
+                "id":      job_id(j.get("job_title",""), j.get("employer_name","")),
+                "title":   j.get("job_title",""),
+                "company": j.get("employer_name","Unknown"),
+                "location":f"{j.get('job_city','')}, {j.get('job_country','')}".strip(", "),
+                "source":  j.get("job_publisher","JSearch"), "role": role,
+                "salary":  f"${int(j['job_min_salary']/1000)}k+" if j.get("job_min_salary") else "",
+                "url":     j.get("job_apply_link",""),
+                "jd":      j.get("job_description","")[:500],
+                "remote":  j.get("job_is_remote", False),
+            })
+        return jobs, None
+    except Exception as e:
+        return [], str(e)
 
-JOB: {job_title} at {company}
-JD: {jd[:1000]}
-
-RESUME:
-{resume[:2000]}
-
-Return only JSON."""
-        }]
-    )
-    raw = message.content[0].text.strip()
-    return json.loads(raw.replace("```json","").replace("```","").strip())
-
-def refine_resume(client, resume, job_title, company, jd, gap_reasons):
-    """Step 2 — only called if score < threshold."""
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=1500,
-        system="""You are an expert resume writer for PM and Growth roles.
-The applicant is Nabhey — Product Analyst, Goa India, targeting MNC remote/hybrid roles.
-Return ONLY the full refined resume as plain text. No JSON, no markdown headers, no explanation.
-Rewrite to maximise match with the job while staying truthful.""",
-        messages=[{
-            "role": "user",
-            "content": f"""Refine this resume for the job below.
-
-JOB: {job_title} at {company}
-JD: {jd[:1000]}
-
-GAPS TO ADDRESS:
-{chr(10).join(f'- {g}' for g in gap_reasons)}
-
-ORIGINAL RESUME:
-{resume}
-
-Return the full refined resume as plain text."""
-        }]
-    )
-    return message.content[0].text.strip()
+def save_jobs(ws, jobs, existing_ids):
+    new_count = 0
+    errors = []
+    for job in jobs:
+        if job["id"] in existing_ids:
+            continue
+        try:
+            ws.append_row([
+                job["id"], str(date.today()), job["title"], job["company"],
+                job["location"], job["source"], job["role"], job.get("salary",""),
+                job["url"], job["jd"][:200],  # truncate JD to avoid cell size limit
+                "Yes" if job.get("remote") else "No",
+                "New", "", ""
+            ])
+            existing_ids.add(job["id"])
+            new_count += 1
+            time.sleep(0.5)  # increased delay to avoid quota
+        except Exception as e:
+            errors.append(f"{job['title']}: {str(e)[:100]}")
+            time.sleep(2)  # back off on error
+            continue
+    if errors:
+        st.warning(f"⚠️ {len(errors)} rows failed: {errors[0]}")
+    return new_count
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-st.title("🧠 App 2 — Resume Matcher & Refiner")
-st.caption("Scores each job against your resume. Refines resume if score < 70%.")
+st.title("🔍 App 1 — Job Scraper")
+st.caption("Fetches jobs from Adzuna + JSearch and saves to Google Sheet.")
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st.header("🔧 Search Settings")
 
-    st.subheader("Google Sheet")
-    sheet_name = st.text_input("Sheet File Name", value="Job Pipeline",
-                               help="Same sheet name as App 1")
-
-    # Load available tabs
-    tab_name = None
-    if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
-        try:
-            client_gs = get_gspread_client()
-            sh = client_gs.open(sheet_name)
-            tabs = [ws.title for ws in sh.worksheets()]
-            if tabs:
-                tab_name = st.selectbox("Select Run Tab", options=tabs, index=0)
-            else:
-                st.warning("No tabs found in sheet.")
-        except Exception as e:
-            st.error(f"Sheet error: {e}")
-
-    st.divider()
-    st.subheader("Your Resume")
-    st.caption("Paste your base resume — Claude will tailor it per job")
-    resume_text = st.text_area(
-        "resume",
-        height=300,
-        placeholder="Paste your full resume here...\n\nExperience, skills, education, achievements...",
+    st.subheader("Job Positions")
+    st.caption("One role per line — add or remove as needed")
+    roles_input = st.text_area(
+        "roles",
+        value="\n".join(DEFAULT_ROLES),
+        height=120,
         label_visibility="collapsed"
     )
-    st.caption(f"{len(resume_text.split())} words")
+    ROLES = [r.strip() for r in roles_input.strip().split("\n") if r.strip()]
 
     st.divider()
-    st.subheader("Threshold")
-    threshold = st.slider(
-        "Refine if score below (%)",
-        min_value=40, max_value=90,
-        value=SCORE_THRESHOLD,
-        help="Jobs below this score will get a tailored resume"
+    st.subheader("Country")
+    selected_country = st.selectbox(
+        "country",
+        options=list(COUNTRY_MAP.keys()),
+        index=0,
+        label_visibility="collapsed"
     )
+    adzuna_country = COUNTRY_MAP[selected_country]["adzuna"]
+    jsearch_country = COUNTRY_MAP[selected_country]["jsearch"]
 
-# ── Config check ──────────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Days Back")
+    days_back = st.slider("Fetch jobs posted in last N days", 1, 30, DEFAULT_DAYS_BACK)
+
+    st.divider()
+    st.subheader("Google Sheet")
+    SHEET_NAME = st.text_input(
+        "Sheet File Name",
+        value="Job Pipeline",
+        placeholder="e.g. Job Pipeline",
+        help="Exact name of your Google Sheet (case sensitive)"
+    )
+    st.caption("📌 Create a Google Sheet with this exact name, then share it with Editor access to:")
+    st.markdown("""
+<div style="background:#0d1a00; border:1px solid #34d399; border-left:3px solid #34d399;
+     border-radius:6px; padding:12px; margin-top:4px;">
+    <span style="color:#a0aec0; font-size:12px;">Share with <strong>Editor</strong> access to:</span><br/>
+    <div style="background:#0a0f00; border:1px solid #2a4a00; border-radius:4px;
+         padding:8px; margin-top:6px; word-break:break-all;">
+        <span style="color:#38bdf8; font-size:11px; font-weight:bold;">
+            nabhey@airy-gate-238512.iam.gserviceaccount.com
+        </span>
+    </div>
+    <span style="color:#4a6a4a; font-size:11px; margin-top:6px; display:block;">
+        Jobs will auto-save here on every run.
+    </span>
+</div>
+""", unsafe_allow_html=True)
+
+# ── Config validation ─────────────────────────────────────────────────────────
 config_ok = True
-if "PASTE_YOUR_ANTHROPIC_API_KEY_HERE" in ANTHROPIC_KEY:
-    st.warning("⚠️ Add your Anthropic API key in the CONFIG section of `app2_matcher.py`")
+warnings = []
+if "PASTE_YOUR_ADZUNA_APP_ID_HERE"  in ADZUNA_ID:   warnings.append("Adzuna App ID not set")
+if "PASTE_YOUR_ADZUNA_APP_KEY_HERE" in ADZUNA_KEY:  warnings.append("Adzuna App Key not set")
+if "PASTE_YOUR_RAPIDAPI_KEY_HERE"   in JSEARCH_KEY: warnings.append("JSearch key not set")
+if "PASTE_YOUR_FULL_SERVICE"        in CREDS_JSON:  warnings.append("Service Account JSON not set")
+
+if warnings:
+    st.warning(f"⚠️ Open `app1_scraper.py` → fill CONFIG section: {', '.join(warnings)}")
     config_ok = False
-if not resume_text.strip():
-    st.info("📄 Paste your resume in the sidebar to begin.")
-    config_ok = False
 
-# ── Load jobs ─────────────────────────────────────────────────────────────────
-ws, rows, load_err = None, [], None
-if tab_name and "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON:
-    ws, rows, load_err = load_jobs(sheet_name, tab_name)
-    if load_err:
-        st.error(f"Load error: {load_err}")
+# ── Sheet connection ──────────────────────────────────────────────────────────
+ws, sheet_err, tab_name = None, None, None
+if "PASTE_YOUR_FULL_SERVICE" not in CREDS_JSON and CREDS_JSON.strip():
+    ws, sheet_err, tab_name = get_sheet(SHEET_NAME, ROLES)
+    if sheet_err:
+        st.error(f"Sheet error: {sheet_err}")
+    else:
+        st.success(f"✅ Connected to **{SHEET_NAME}** → new tab: **{tab_name}**")
 
-new_jobs = [r for r in rows if r.get("Status") == "New"]
+existing_ids = get_existing_ids(ws) if ws else set()
 
-# Stats
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total Jobs",    len(rows))
-c2.metric("New / Pending", len(new_jobs))
-c3.metric("Threshold",     f"{threshold}%")
-c4.metric("Last Run",      st.session_state.get("last_run_2", "Never"))
+c1.metric("In Sheet",  len(existing_ids))
+c2.metric("Roles",     len(ROLES))
+c3.metric("Country",   selected_country)
+c4.metric("Last Run",  st.session_state.get("last_run", "Never"))
 
 st.divider()
 
-if rows and not new_jobs:
-    st.success("✅ All jobs already processed!")
-
-if new_jobs:
-    st.markdown(f"**{len(new_jobs)} jobs** ready to score from tab **{tab_name}**")
+if not ROLES:
+    st.error("Add at least one job role in the sidebar.")
+else:
+    st.markdown(f"**Searching for:** {' · '.join(ROLES)}")
 
 run_btn = st.button(
-    "▶ Run Matcher",
+    "▶ Run Scraper",
     type="primary",
-    disabled=(not config_ok or not ws or not new_jobs),
+    disabled=(not config_ok or not ROLES),
 )
 
-# ── Matching logic ────────────────────────────────────────────────────────────
+# ── Scraping ──────────────────────────────────────────────────────────────────
 if run_btn:
-    anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+    all_jobs, log_lines = [], []
+    total_steps = max(len(ROLES) * 2, 1)
+    step = 0
     progress = st.progress(0, text="Starting...")
-    total    = len(new_jobs)
-    results  = []
 
-    for i, job in enumerate(new_jobs):
-        title   = job.get("Title", "")
-        company = job.get("Company", "")
-        jd      = job.get("JD Summary", "")
-        row_num = i + 2  # +2 for header row
+    for role in ROLES:
+        progress.progress(step / total_steps, text=f"Adzuna → {role}...")
+        jobs, err = fetch_adzuna(role, adzuna_country)
+        log_lines.append(f"{'✅' if not err else '⚠️'} Adzuna / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
+        all_jobs.extend(jobs)
+        step += 1
 
-        progress.progress(i / total, text=f"Scoring: {title} @ {company}...")
+        progress.progress(step / total_steps, text=f"JSearch → {role}...")
+        jobs, err = fetch_jsearch(role, days_back, jsearch_country)
+        log_lines.append(f"{'✅' if not err else '⚠️'} JSearch / {role}: {len(jobs)} jobs" + (f" ({err})" if err else ""))
+        all_jobs.extend(jobs)
+        step += 1
+        time.sleep(0.5)
 
-        # Step 1 — Score
-        try:
-            score_data   = score_job(anthropic_client, resume_text, title, company, jd)
-            score        = score_data.get("score", 0)
-            verdict      = score_data.get("verdict", "Unknown")
-            gap_reasons  = score_data.get("gap_reasons", [])
-        except Exception as e:
-            st.warning(f"Score failed for {title}: {e}")
-            continue
+    # Dedupe
+    seen, deduped = {}, []
+    for j in all_jobs:
+        if j["id"] not in seen:
+            seen[j["id"]] = True
+            deduped.append(j)
 
-        # Step 2 — Refine only if below threshold
-        tailored = ""
-        if score < threshold:
-            progress.progress(i / total, text=f"Refining resume for: {title}...")
-            try:
-                tailored = refine_resume(
-                    anthropic_client, resume_text,
-                    title, company, jd, gap_reasons
-                )
-                status = "Refined"
-            except Exception as e:
-                st.warning(f"Refine failed for {title}: {e}")
-                status = "Score Only"
-        else:
-            status = "Good Match"
+    progress.progress(1.0, text="Saving to sheet...")
 
-        # Update sheet
-        update_row(ws, row_num, score, verdict, tailored, status)
+    if ws:
+        new_count = save_jobs(ws, deduped, existing_ids)
+        st.session_state["last_run"] = datetime.now().strftime("%H:%M, %d %b")
+        st.success(f"✅ Done — {len(deduped)} unique jobs, **{new_count} new** added to sheet.")
+    else:
+        st.warning(f"Found {len(deduped)} jobs but Sheet not connected — fix CREDS_JSON in config.")
 
-        results.append({
-            "title":   title,
-            "company": company,
-            "score":   score,
-            "verdict": verdict,
-            "status":  status,
-            "refined": bool(tailored),
-        })
-        time.sleep(1)
-
-    progress.progress(1.0, text="Done!")
     progress.empty()
-    st.session_state["last_run_2"] = datetime.now().strftime("%H:%M, %d %b")
 
-    # Summary
-    refined_count = sum(1 for r in results if r["refined"])
-    good_count    = sum(1 for r in results if not r["refined"])
-    st.success(f"✅ Done — {len(results)} jobs scored. {refined_count} resumes refined, {good_count} already good match.")
+    with st.expander("Run Log", expanded=True):
+        for line in log_lines:
+            st.write(line)
 
-    # Results cards
-    st.subheader("Results")
-    for r in results:
-        score_class = "score-high" if r["score"] >= 70 else "score-mid" if r["score"] >= 50 else "score-low"
-        status_tag  = f'<span class="refined-tag">✨ Refined</span>' if r["refined"] else f'<span class="skipped-tag">✓ Good Match</span>'
-        st.markdown(f"""
-        <div class="job-card">
-            <strong>{r['title']}</strong> — {r['company']} &nbsp; {status_tag}<br/>
-            <span class="{score_class}">{r['score']}%</span>
-            <span style="color:#6868a8; font-size:13px; margin-left:8px;">{r['verdict']}</span>
-        </div>""", unsafe_allow_html=True)
-
-# ── Preview existing results ──────────────────────────────────────────────────
-if rows and not run_btn:
-    processed = [r for r in rows if r.get("Status") not in ("New", "")]
-    if processed:
-        st.subheader(f"Previously Processed ({len(processed)})")
-        for r in processed[:10]:
-            score = r.get("Match Score", "")
-            try:
-                score_int = int(float(score))
-                score_class = "score-high" if score_int >= 70 else "score-mid" if score_int >= 50 else "score-low"
-                score_str = f'<span class="{score_class}">{score_int}%</span>'
-            except:
-                score_str = f'<span class="tag">{score}</span>'
+    if deduped:
+        st.subheader(f"Jobs Found ({len(deduped)})")
+        for job in deduped[:20]:
+            already = job["id"] in existing_ids
             st.markdown(f"""
             <div class="job-card">
-                <strong>{r.get('Title','')}</strong> — {r.get('Company','')} &nbsp;
-                <span class="tag">{r.get('Status','')}</span><br/>
-                {score_str}
-                <span style="color:#6868a8; font-size:13px; margin-left:8px;">{r.get('Verdict','')}</span>
+                <strong>{job['title']}</strong> &nbsp;
+                <span class="{'tag' if already else 'new-tag'}">{'duplicate' if already else 'NEW'}</span><br/>
+                <span style="color:#8888aa">{job['company']} · {job['location']}</span><br/><br/>
+                <span class="tag">{job['source']}</span>
+                <span class="tag">{job['role']}</span>
+                {'<span class="tag">Remote</span>' if job.get('remote') else ''}
+                {f'<span class="tag">{job["salary"]}</span>' if job.get("salary") else ''}
             </div>""", unsafe_allow_html=True)
