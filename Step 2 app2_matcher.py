@@ -31,7 +31,7 @@ st.markdown("""
 # ════════════════════════════════════════════════════════════════════════════════
 
 # 1. GEMINI API KEY — free at https://aistudio.google.com → Get API Key
-GEMINI_KEY = "AIzaSyBmdRww9IYs4xLA1OUCMrX3iqiJHbpm8z0"
+GEMINI_KEY = "AIzaSyBk_heOWnxQSs4ZDrvfePvcj4ZLsDnu_Bs"
 
 # 2. SAME SERVICE ACCOUNT JSON as App 1
 CREDS_JSON = """
