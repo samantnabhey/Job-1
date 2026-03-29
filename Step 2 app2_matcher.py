@@ -98,7 +98,7 @@ def update_row(ws, row_num, score, verdict, tailored_resume, status):
         ws.update_cell(row_num, 13, score)
         ws.update_cell(row_num, 14, verdict)
         ws.update_cell(row_num, 15, tailored_resume[:40000] if tailored_resume else "")
-        time.sleep(0.5)
+        time.sleep(5)
     except Exception as e:
         st.warning(f"Row {row_num} update error: {e}")
 
