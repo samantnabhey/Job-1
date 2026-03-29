@@ -26,20 +26,22 @@ st.markdown("""
 
 # ════════════════════════════════════════════════════════════════════════════════
 # ██  CONFIGURE HERE — change these values, nothing else needs to be touched  ██
-# ════════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+ADZUNA_ID  = "ac1a4ebd"
+ADZUNA_KEY = "b24bf85fcd6f5da0c1bf82d2d8ab5d30"
+JSEARCH_KEY = "c878633452mshdf37c1410b3565bp18b884jsn05ae0b0654b8"
 
-# 1. ADZUNA — get free at https://developer.adzuna.com
-ADZUNA_ID  = "PASTE_YOUR_ADZUNA_APP_ID_HERE"
-ADZUNA_KEY = "PASTE_YOUR_ADZUNA_APP_KEY_HERE"
-
-# 2. JSEARCH — get free at https://rapidapi.com → search JSearch → subscribe Basic
-JSEARCH_KEY = "PASTE_YOUR_RAPIDAPI_KEY_HERE"
-
-# 3. SERVICE ACCOUNT JSON — paste full JSON from GCP between the triple quotes
-#    console.cloud.google.com → IAM → Service Accounts → Keys → Add Key → JSON
 CREDS_JSON = """
-PASTE_YOUR_FULL_SERVICE_ACCOUNT_JSON_HERE
-"""
+{
+  "type": "service_account",
+  "project_id": "airy-gate-238512",
+  "private_key_id": "51cf2f8c913a7f9c5a84daac96bebfe3ff5048db",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCkm3nqSAH1U+W9\nJsqvdUVWX4IBsdMSl/3zTXajWjzgBVZ/ID3VVevckHZ/Xy3Jo8Xi1LQIM2N3GnRD\nFmaIEi85VLkxmuicFcpZElkNnrXJ3PERvpjxYc5O4s+UVIuJl4Aj3rM9H0OqdzgS\nIPaokdxK7uzCLIQW0inl2Dxk0r4wkyh5vskD48HnXpcPnyMTKbuBvIP1Qneoe6jA\nkG1PnWqsYhqCdWwK2qJsruO+vI4bLjFEd9TkZVyaJ+QxAiIJ0cGf61qkVQCxCW7l\nhhC0dlVwGlVs8Gix3pZLyaJfpu16hKi5zF2RPPCpDcsuwZaXqLmyJIBycshQxrHR\nzLr6jikHAgMBAAECggEAI57ZhQ9MDTC4mHQajFmORaCpW4CFspJdjBcJQ1Q1tCyz\niRMLDm1nevVwDyQjnmzoV6u7wcKNFasN2a6xRWTZ/0gMQ2XITG6SuS+1QbNEl4hO\nSo66PhHyOTPvw6OABqhYPGrm0qU/WVYvNg0YE2ZtC3IknehQNTgJhQmEGDVantwA\njzm/mmS+hFQ3bpz6xXAGsFZVhjeCLw86VJ+MOG1sl5s3iU8CuTi/dVRD4X36r5Kg\ntD+ie2T4c0Tig9FemfPNAhp/dXXs3hMTmMkGmY0BLfcL7ZSCF/MJIbefYN/1QEpM\noNhtj/7M1NXo5nLaHXJ5VBKfxS10ey5fmRyszGUNsQKBgQDVUU5h/j1GNL2ZT68P\nEGNFrRXzFozF+C/aynHas7T6zgSzvqE8RbX0lnIWg9Nn6tmGJPs1kpRSuUsebm5p\nhsDubC5OHbCaCggaPfa66XA9JeHR7j6YcGz4Zt+azJUWhXLSL/QKSgasR7td1N5m\nWB8M+Qw9OLDcEUn24jn1x8Tj1QKBgQDFixm+D8nrRR4ylpftjfh1m4TG3mb7+f26\nCSW95ViWerC9lL3pOO6odM2MnJsFYUwt8PHw5ErsDb/SkEn04w3PqnN7EkKYLzgs\n+xbD5OFLLSeMLydeKix2NFM/V9/MxaO/A+xax57gRo6T+VGdV+VlaViZcOY/am7s\n1pXy66GzawKBgFTAZvn7/vBDyAh/Zjf/9NEcAZqBHRESmEC/KhkQSRlUfP3FAV5m\n+/HfTBix625gGmh3jO8t+4waXkQK8AcxKLoRdRxII4Av+CQk9kAwuw0wXdYAaBI8\nqK7QgIqKObmm74We08C6xIfyP/j5uBrFbCDFWh2AxpPIsrBKFWkXI5y5AoGAaGBr\nJaWqBwnqPsibVgWhtmKJ8ZopyBH7IoUa0A+Sk1AYetNQ1R4j3BZ7VUSaFGmoms2o\nyKOXgspxBI0AxsgB0Cw8AFdRoJ+yivHQwYj6EYK2VrfDkVmvTHWxVtLTiZsUPiWQ\niRbYt6AQTdd6bCy5JLBZBBpHTlKqcbGgYU5njikCgYBhVjeOZF0xFDKbSkCOJA2z\n30NyW/PPNabm++T1tUlQSyCttGcgX7CpMUXhyYiKSAL72Mw+tAr2qudggSyl1PMn\nTZg7Tv51cnNnUM01RAKrDCn33PfIdnU1mUG20EDRUcIvH7jN+MTbmCN9J6UxIjHC\nj/dbbQ1r1LnhO2KOrcGH2A==\n-----END PRIVATE KEY-----\n",
+  "client_email": "nabhey@airy-gate-238512.iam.gserviceaccount.com",
+  "client_id": "100136393772596802414",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token"
+}"""
 
 # 4. DEFAULT ROLES — user can change in the app sidebar
 DEFAULT_ROLES = [
